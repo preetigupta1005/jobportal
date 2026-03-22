@@ -14,7 +14,7 @@ const useGetAllAdminJobs = () => {
                     dispatch(setAllAdminJobs(res.data.jobs));
                 }
             } catch (error) {
-                console.log(error);
+                // Error handled silently - toast notification shown by caller
             }
         }
         fetchAllAdminJobs();

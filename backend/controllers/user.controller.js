@@ -8,20 +8,53 @@ export const register = async (req, res) => {
     try {
         const { fullname, email, phoneNumber, password, role } = req.body;
          
+        // Validation
         if (!fullname || !email || !phoneNumber || !password || !role) {
             return res.status(400).json({
-                message: "Something is missing",
+                message: "All fields are required",
                 success: false
             });
-        };
-        
-        // Check if user already exists
-        const user = await User.findOne({ email });
-        if (user) {
+        }
+
+        // Validate email format
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
             return res.status(400).json({
-                message: 'User already exist with this email.',
+                message: 'Invalid email format',
                 success: false,
-            })
+            });
+        }
+
+        // Validate Indian phone number (10 digits starting with 6-9)
+        const phoneRegex = /^[6-9]\d{9}$/;
+        if (!phoneRegex.test(phoneNumber.replace(/\s/g, ''))) {
+            return res.status(400).json({
+                message: 'Invalid phone number. Enter a valid 10-digit Indian mobile number',
+                success: false,
+            });
+        }
+
+        // Validate password strength
+        if (password.length < 8) {
+            return res.status(400).json({
+                message: 'Password must be at least 8 characters long',
+                success: false,
+            });
+        }
+        if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])/.test(password)) {
+            return res.status(400).json({
+                message: 'Password must contain uppercase, lowercase, number, and special character',
+                success: false,
+            });
+        }
+         
+        // Check if user already exists
+        const existingUser = await User.findOne({ email });
+        if (existingUser) {
+            return res.status(400).json({
+                message: 'User already exists with this email',
+                success: false,
+            });
         }
         
         const hashedPassword = await bcrypt.hash(password, 10);
@@ -35,9 +68,9 @@ export const register = async (req, res) => {
         }
 
         await User.create({
-            fullname,
-            email,
-            phoneNumber,
+            fullname: fullname.trim(),
+            email: email.trim().toLowerCase(),
+            phoneNumber: phoneNumber.replace(/\s/g, ''),
             password: hashedPassword,
             role,
             profile:{
@@ -46,13 +79,13 @@ export const register = async (req, res) => {
         });
 
         return res.status(201).json({
-            message: "Account created successfully.",
+            message: "Account created successfully",
             success: true
         });
     } catch (error) {
-        console.log(error);
+        console.error('Registration error:', error);
         return res.status(500).json({
-            message: error.message || "Internal server error",
+            message: error.message || "Registration failed",
             success: false
         });
     }
@@ -61,55 +94,77 @@ export const login = async (req, res) => {
     try {
         const { email, password, role } = req.body;
         
+        // Validation
         if (!email || !password || !role) {
             return res.status(400).json({
-                message: "Something is missing",
+                message: "Email, password and role are required",
                 success: false
             });
-        };
-        let user = await User.findOne({ email });
-        if (!user) {
-            return res.status(400).json({
-                message: "Incorrect email or password.",
-                success: false,
-            })
         }
+
+        // Validate email format
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            return res.status(400).json({
+                message: 'Invalid email format',
+                success: false,
+            });
+        }
+        
+        const user = await User.findOne({ email: email.trim().toLowerCase() });
+        if (!user) {
+            return res.status(401).json({
+                message: "Invalid email or password",
+                success: false,
+            });
+        }
+        
         const isPasswordMatch = await bcrypt.compare(password, user.password);
         if (!isPasswordMatch) {
-            return res.status(400).json({
-                message: "Incorrect email or password.",
+            return res.status(401).json({
+                message: "Invalid email or password",
                 success: false,
-            })
-        };
-        // check role is correct or not
+            });
+        }
+        
+        // Check role
         if (role !== user.role) {
-            return res.status(400).json({
-                message: "Account doesn't exist with current role.",
+            return res.status(403).json({
+                message: `This account is registered as ${user.role}, not ${role}`,
                 success: false
-            })
-        };
+            });
+        }
 
         const tokenData = {
             userId: user._id
-        }
-        const token = await jwt.sign(tokenData, process.env.JWT_SECRET, { expiresIn: '1d' });
+        };
+        const token = jwt.sign(tokenData, process.env.JWT_SECRET, { expiresIn: '1d' });
 
-        user = {
+        const userResponse = {
             _id: user._id,
             fullname: user.fullname,
             email: user.email,
             phoneNumber: user.phoneNumber,
             role: user.role,
             profile: user.profile
-        }
+        };
 
-        return res.status(200).cookie("token", token, { maxAge: 1 * 24 * 60 * 60 * 1000, httpsOnly: true, sameSite: 'strict' }).json({
-            message: `Welcome back ${user.fullname}`,
-            user,
+        return res.status(200).cookie("token", token, { 
+            maxAge: 24 * 60 * 60 * 1000, 
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict' 
+        }).json({
+            message: `Welcome back, ${user.fullname}!`,
+            user: userResponse,
             success: true
-        })
+        });
     } catch (error) {
-        console.log(error);
+        console.error('Login error:', error);
+        return res.status(500).json({
+            message: "Login failed",
+            success: false
+        });
     }
 }
 export const logout = async (req, res) => {

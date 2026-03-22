@@ -29,7 +29,8 @@ const CompanyCreate = () => {
                 navigate(`/admin/companies/${companyId}`);
             }
         } catch (error) {
-            console.log(error);
+            // Error handled by toast notification
+            toast.error(error.response?.data?.message || "An error occurred");
         }
     }
     return (

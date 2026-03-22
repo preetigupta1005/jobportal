@@ -30,8 +30,8 @@ const JobDescription = () => {
 
             }
         } catch (error) {
-            console.log(error);
-            toast.error(error.response.data.message);
+            // Error handled by toast notification
+            toast.error(error.response?.data?.message || "An error occurred");
         }
     }
 
@@ -44,7 +44,7 @@ const JobDescription = () => {
                     setIsApplied(res.data.job.applications.some(application=>application.applicant === user?._id)) // Ensure the state is in sync with fetched data
                 }
             } catch (error) {
-                console.log(error);
+                // Error handled silently - UI shows no job details
             }
         }
         fetchSingleJob(); 

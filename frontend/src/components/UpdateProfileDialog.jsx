@@ -57,13 +57,12 @@ const UpdateProfileDialog = ({ open, setOpen }) => {
                 toast.success(res.data.message);
             }
         } catch (error) {
-            console.log(error);
-            toast.error(error.response.data.message);
+            // Error handled by toast notification
+            toast.error(error.response?.data?.message || "An error occurred");
         } finally{
             setLoading(false);
         }
         setOpen(false);
-        console.log(input);
     }
 
 
